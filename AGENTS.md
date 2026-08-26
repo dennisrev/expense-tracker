@@ -13,7 +13,6 @@ Vue 3 + TypeScript + Vite expense tracker with CRUD, filtering, sorting, summary
 - `src/components/ExpenseList.vue` — display expenses with delete/edit actions
 - `src/components/SummaryDashboard.vue` — total + breakdown per category
 - `src/composables/useExpenses.ts` — CRUD + LocalStorage logic
-- `src/composables/useFilters.ts` — filtering, sorting, summary computations
 
 ## TypeScript types
 - Category enum: `'Food' | 'Transport' | 'Entertainment' | 'Other'`
@@ -26,7 +25,6 @@ Vue 3 + TypeScript + Vite expense tracker with CRUD, filtering, sorting, summary
 - Description min 3 chars, max 100 chars
 
 ## Edge cases
-- Empty state: show "No expenses yet" message when list is empty
 - LocalStorage: wrap `getItem/setItem` in try/catch; fallback to empty array on error
 - Negative amounts: reject with error message
 

@@ -1,7 +1,12 @@
 import type { Category, Expense } from './types'
 
 // Initialize expenses from LocalStorage or fallback to empty array
-const storedExpenses = localStorage.getItem('expenses')
+let storedExpenses: string | null
+try {
+  storedExpenses = localStorage.getItem('expenses')
+} catch (e) {
+  storedExpenses = null
+}
 const initialExpenses: Expense[] = storedExpenses
   ? JSON.parse(storedExpenses)
   : []
@@ -59,7 +64,7 @@ export const addExpense = (
   // Update state and persist
   // In a real composable, this would use Vue's reactive state
   // For now, we return the new expense and expect the caller to manage state
-  persistExpenses([...newExpense]) // Note: this is a simplified persist
+  persistExpenses([newExpense])
 
   return newExpense
 }
@@ -116,6 +121,4 @@ export const updateExpense = (
 }
 
 // Export type and state for use in components
-export type { UseExpensesState }
-
 export { initialExpenses }
