@@ -1,124 +1,102 @@
+import { ref } from 'vue'
 import type { Category, Expense } from './types'
 
-// Initialize expenses from LocalStorage or fallback to empty array
-let storedExpenses: string | null
-try {
-  storedExpenses = localStorage.getItem('expenses')
-} catch (e) {
-  storedExpenses = null
-}
-const initialExpenses: Expense[] = storedExpenses
-  ? JSON.parse(storedExpenses)
-  : []
+const STORAGE_KEY = 'expenses'
 
-// Reactive state
-const expenses: Expense[] = initialExpenses
-
-// State
-export interface UseExpensesState {
-  expenses: Expense[]
-  loading: boolean
-  error: string | null
-}
-
-// Helper: generate unique ID
-const generateId = (): string => crypto.randomUUID()
-
-// Helper: persist expenses to LocalStorage with error handling
-const persistExpenses = (expenses: Expense[]): void => {
+function loadExpenses(): Expense[] {
   try {
-    localStorage.setItem('expenses', JSON.stringify(expenses))
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored ? JSON.parse(stored) : []
+  } catch {
+    return []
+  }
+}
+
+function saveExpenses(expenses: Expense[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses))
   } catch (e) {
     console.error('LocalStorage error: could not persist expenses', e)
-    // Fallback: silently continue with in-memory state only
   }
 }
 
-// Actions
-export const addExpense = (
-  description: string,
-  amount: number,
-  category: Category,
-  date: string = new Date().toISOString().split('T')[0]
-): Expense => {
-  if (amount <= 0) {
-    throw new Error('Amount must be greater than 0')
-  }
+const generateId = (): string => crypto.randomUUID()
 
-  if (description.trim().length < 3) {
-    throw new Error('Description must be at least 3 characters')
-  }
+const expenses = ref<Expense[]>(loadExpenses())
+const loading = ref(false)
+const error = ref<string | null>(null)
 
-  if (description.trim().length > 100) {
-    throw new Error('Description must be at most 100 characters')
-  }
-
-  const newExpense: Expense = {
-    id: generateId(),
-    date,
-    amount,
-    category,
-    description: description.trim(),
-  }
-
-  // Update state and persist
-  // In a real composable, this would use Vue's reactive state
-  // For now, we return the new expense and expect the caller to manage state
-  persistExpenses([newExpense])
-
-  return newExpense
+function validateAmount(amount: number): void {
+  if (amount <= 0) throw new Error('Amount must be greater than 0')
 }
 
-// Delete expense with confirm dialog
-export const deleteExpense = (id: string): Expense | null => {
-  if (!confirm("Verwijder deze uitgave?")) return null
-
-  const index = expenses.findIndex((exp) => exp.id === id)
-  if (index === -1) return null
-
-  const [deleted] = expenses.splice(index, 1)
-  persistExpenses(expenses)
-  return deleted
+function validateDescription(description: string): void {
+  const trimmed = description.trim()
+  if (trimmed.length < 3) throw new Error('Description must be at least 3 characters')
+  if (trimmed.length > 100) throw new Error('Description must be at most 100 characters')
 }
 
-// Update expense with validation
-export const updateExpense = (
-  id: string,
-  updates: Partial<Expense>
-): Expense | null => {
-  const index = expenses.findIndex((exp) => exp.id === id)
-  if (index === -1) return null
+export function useExpenses() {
+  function addExpense(
+    description: string,
+    amount: number,
+    category: Category,
+    date: string = new Date().toISOString().split('T')[0]
+  ): Expense {
+    validateAmount(amount)
+    validateDescription(description)
 
-  const existing = expenses[index]
-
-  // Validate updated fields
-  if (updates.amount !== undefined && updates.amount <= 0) {
-    throw new Error('Amount must be greater than 0')
-  }
-
-  if (updates.description !== undefined) {
-    const desc = updates.description.trim()
-    if (desc.length < 3) {
-      throw new Error('Description must be at least 3 characters')
+    const newExpense: Expense = {
+      id: generateId(),
+      date,
+      amount,
+      category,
+      description: description.trim(),
     }
-    if (desc.length > 100) {
-      throw new Error('Description must be at most 100 characters')
+
+    expenses.value.push(newExpense)
+    saveExpenses(expenses.value)
+    return newExpense
+  }
+
+  function updateExpense(id: string, updates: Partial<Expense>): Expense | null {
+    const index = expenses.value.findIndex((exp) => exp.id === id)
+    if (index === -1) return null
+
+    const existing = expenses.value[index]
+
+    if (updates.amount !== undefined) validateAmount(updates.amount)
+    if (updates.description !== undefined) validateDescription(updates.description)
+
+    const updated: Expense = {
+      ...existing,
+      ...updates,
+      description: updates.description ? updates.description.trim() : existing.description,
+      amount: updates.amount !== undefined ? updates.amount : existing.amount,
     }
+
+    expenses.value[index] = updated
+    saveExpenses(expenses.value)
+    return updated
   }
 
-  // Merge updates with existing expense
-  const updated: Expense = {
-    ...existing,
-    ...updates,
-    description: updates.description ? updates.description.trim() : existing.description,
-    amount:
-      updates.amount !== undefined ? updates.amount : existing.amount,
+  function deleteExpense(id: string): Expense | null {
+    const index = expenses.value.findIndex((exp) => exp.id === id)
+    if (index === -1) return null
+
+    const [deleted] = expenses.value.splice(index, 1)
+    saveExpenses(expenses.value)
+    return deleted
   }
 
-  expenses[index] = updated
-  persistExpenses(expenses)
-  return updated
+  return {
+    expenses,
+    loading,
+    error,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+  }
 }
 
-// Export type and state for use in components
-export { initialExpenses }
+export type { Expense, Category }
